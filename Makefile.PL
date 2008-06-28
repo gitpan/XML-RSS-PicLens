@@ -13,9 +13,10 @@ WriteMakefile(
     ABSTRACT_FROM => 'lib/XML/RSS/PicLens.pm',
     PL_FILES      => {},
     PREREQ_PM     => {
-        'Test::More' => 0,
-        'Test::XML'  => '0.07',
-        'XML::RSS'   => '1.33',
+        'Test::More'    => 0,
+        'Test::XML'     => '0.07',
+        'XML::RSS'      => '1.33',
+        'Data::Section' => '0.004',
     },
     dist  => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
     clean => { FILES    => 'XML-RSS-PicLens-*' },
