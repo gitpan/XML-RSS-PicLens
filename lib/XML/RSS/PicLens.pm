@@ -12,24 +12,24 @@ XML::RSS::PicLens - Create a PicLens compatible RSS feed
 
 =head1 VERSION
 
-This document describes XML::RSS::PicLens version 0.02
+This document describes XML::RSS::PicLens version 0.03
 
 =cut
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 =head1 SYNOPSIS
 
-    use XML::RSS::PicLens;
+  use XML::RSS::PicLens;
 
-    my $feed = XML::RSS::PicLens->new;
-    $feed->add_image(
-        link      => 'foo.jpg',
-        image     => 'foo.jpg',
-        thumbnail => 'thumbs/foo.jpg',
-        title     => 'An bootiful foo'
-    );
-    print $feed->as_string;
+  my $feed = XML::RSS::PicLens->new;
+  $feed->add_content(
+    link      => 'foo.jpg',
+    image     => 'foo.jpg',
+    thumbnail => 'thumbs/foo.jpg',
+    title     => 'An bootiful foo'
+  );
+  print $feed->as_string;
 
 =head1 DESCRIPTION
 
@@ -51,70 +51,101 @@ superclass's constructor. The RSS version defaults to 2.0.
 =cut
 
 sub new {
-    my $class = shift;
-    my $self = $class->SUPER::new( version => '2.0', @_ );
+  my $class = shift;
+  my $self = $class->SUPER::new( version => '2.0', @_ );
 
-    $self->add_module(
-        prefix => 'media',
-        uri    => 'http://search.yahoo.com/mrss'
+  $self->add_module(
+    prefix => 'media',
+    uri    => 'http://search.yahoo.com/mrss'
+  );
+
+  return $self;
+}
+
+=head2 C<< add_content >>
+
+Add media content to the feed:
+
+    $feed->add_content(
+        link            => 'foo.jpg',
+        content         => 'foo.jpg',
+        thumbnail       => 'thumbs/foo.jpg',
+        title           => 'An bootiful foo',
+        content_type    => 'image/jpeg',
+        thumbnail_type  => 'image/jpeg',
     );
 
-    return $self;
+At least one of C<content>, C<thumbnail> must be supplied. Optionally you
+may supply C<link> and C<title>. If these are omitted they will default
+to values based on C<content> or C<thumbnail>. 
+
+The optional C<content_type> and C<thumbnail_type> items may be used to
+specify the MIME types of the content.
+
+For backwards compatibility with previous versions C<image> and
+C<image_type> are accepted as aliases for C<content> and
+C<content_type>.
+
+=cut
+
+sub add_content {
+  my $self = shift;
+  croak "add_content must be called as a method"
+   unless ref $self;
+  croak "add_content needs a number of key => value pairs"
+   if @_ % 1;
+  my %args = @_;
+
+  # Allow image and image_type as aliases for content and content_type
+  exists $args{"image$_"}
+   and $args{"content$_"} = delete $args{"image$_"}
+   for '', '_type';
+
+  my $enc = sub {
+    my $name  = shift;
+    my $tname = "${name}_type";
+    exists $args{$name}
+     ? (
+      $name => {
+        url => $args{$name},
+        exists $args{$tname}
+        ? ( type => $args{$tname} )
+        : (),
+      }
+     )
+     : ();
+  };
+
+  croak "add_content needs at least one of content, thumbnail"
+   unless exists $args{content}
+     or exists $args{thumbnail};
+
+  my $default
+   = exists $args{content}
+   ? $args{content}
+   : $args{thumbnail};
+
+  my $link  = $args{link};
+  my $title = $args{title};
+
+  $link = $default unless defined $link;
+  ( $title = $default ) =~ s!.*/!! unless defined $title;
+
+  $self->add_item(
+    title => $title,
+    link  => $link,
+    media => { $enc->( 'thumbnail' ), $enc->( 'content' ), },
+  );
 }
 
 =head2 C<< add_image >>
 
-Add an image to the feed.
-
-    $feed->add_image(
-        link      => 'foo.jpg',
-        image     => 'foo.jpg',
-        thumbnail => 'thumbs/foo.jpg',
-        title     => 'An bootiful foo'
-    );
-
-At least one of C<image>, C<thumbnail> must be supplied. Optionally you
-may supply C<link> and C<title>. If these are omitted they will default
-to values based on C<image> or C<thumbnail>.
+An alias for C<add_content> for backwards compatibility with
+previous versions. Use C<add_content> in new code.
 
 =cut
 
-sub add_image {
-    my $self = shift;
-    croak "add_image must be called as a method"
-      unless ref $self;
-    croak "add_image needs a number of key => value pairs"
-      if @_ % 1;
-    my %args = @_;
-
-    my $image     = delete $args{image};
-    my $thumbnail = delete $args{thumbnail};
-
-    croak "add_image needs at least one of image, thumbnail"
-      unless defined $image
-          or defined $thumbnail;
-
-    my $default = defined $image ? $image : $thumbnail;
-
-    my $link  = delete $args{link};
-    my $title = delete $args{title};
-
-    $link = $default unless defined $link;
-    ( $title = $default ) =~ s!.*/!! unless defined $title;
-
-    $self->add_item(
-        title => $title,
-        link  => $link,
-        media => {
-            (
-                defined $thumbnail
-                ? ( thumbnail => { url => $thumbnail } )
-                : ()
-            ),
-            ( defined $image ? ( content => { url => $image } ) : () ),
-        },
-    );
-}
+sub add_image { goto &add_content }
 
 =head2 C<< as_string >>
 
